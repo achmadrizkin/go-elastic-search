@@ -30,8 +30,11 @@ func main() {
 	app := fiber.New()
 
 	app.Post("/products", productController.CreateProductHandler)
+
 	app.Get("/products/:id", productController.GetProductByIdHandler)
 	app.Get("/products", productController.GetAllProductHandler)
+
+	app.Delete("/products/:id", productController.DeleteProductByIdHandler)
 
 	// Start the HTTP server
 	err = app.Listen(":8085")

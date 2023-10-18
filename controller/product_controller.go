@@ -24,6 +24,24 @@ func (pc *ProductController) GetAllProductHandler(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(listProduct)
 }
 
+func (pc *ProductController) DeleteProductByIdHandler(c *fiber.Ctx) error {
+	// Extract the :id parameter from the URL path
+	idStr := c.Params("id")
+
+	// Convert the idStr to an integer
+	idInt, err := strconv.Atoi(idStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Invalid ID format")
+	}
+
+	err = pc.operation.DeleteProductById(idInt)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+	}
+
+	return c.Status(fiber.StatusOK).SendString("Delete product by id: " + idStr + " Success")
+}
+
 func (pc *ProductController) GetProductByIdHandler(c *fiber.Ctx) error {
 	// Extract the :id parameter from the URL path
 	idStr := c.Params("id")

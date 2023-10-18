@@ -198,17 +198,36 @@ func (p *Operation) UpdateProduct(product model.Product) error {
 	return nil
 }
 
-func (p *Operation) DeleteProduct(client *elasticsearch.Client, id int) error {
-	// Delete a product by ID from Elasticsearch
-	res, err := p.client.Delete("products", fmt.Sprintf("%d", id), p.client.Delete.WithContext(context.Background()))
+func (p *Operation) DeleteProductById(id int) error {
+	// Create a query to match the product by its ID
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"ID": id,
+			},
+		},
+	}
+
+	// Marshal the query into a JSON byte array
+	queryBytes, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+
+	// Use the Elasticsearch Delete By Query API to remove the product by ID
+	res, err := p.client.DeleteByQuery(
+		[]string{"products"},        // Index names (an array for multi-index)
+		bytes.NewReader(queryBytes), // Wrap queryBytes in an io.Reader
+		p.client.DeleteByQuery.WithContext(context.Background()),
+	)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 
-	// Check for any errors in the response
+	// Check for errors in the response
 	if res.IsError() {
-		return fmt.Errorf("Error: %s", res.Status())
+		return fmt.Errorf("Elasticsearch error: %s", res.Status())
 	}
 
 	return nil
