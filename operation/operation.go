@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang-elastic-search/model"
 	"strings"
@@ -177,22 +178,15 @@ func (p *Operation) GetAllProducts() ([]model.Product, error) {
 	return products, nil
 }
 
-func (p *Operation) UpdateProduct(product model.Product) error {
-	// Update an existing product in Elasticsearch
-	res, err := p.client.Update(
-		"products",
-		fmt.Sprintf("%d", product.ID),
-		strings.NewReader(fmt.Sprintf(`{"doc": {"Name": "%s", "ImageURL": "%s"}}`, product.Name, product.ImageURL)),
-		p.client.Update.WithContext(context.Background()),
-	)
-	if err != nil {
-		return err
+func (p *Operation) UpdateProductById(id int, updatedProduct model.Product) error {
+	// delete
+	if err := p.DeleteProductById(id); err != nil {
+		return errors.New("error delete product by id: " + err.Error())
 	}
-	defer res.Body.Close()
 
-	// Check for any errors in the response
-	if res.IsError() {
-		return fmt.Errorf("error: %s", res.Status())
+	// and insert new data
+	if err := p.CreateProduct(updatedProduct); err != nil {
+		return errors.New("erorr create product: " + err.Error())
 	}
 
 	return nil

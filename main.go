@@ -29,6 +29,8 @@ func main() {
 
 	app := fiber.New()
 
+	app.Put("/products/:id", productController.UpdateProductByIdHandler)
+
 	app.Post("/products", productController.CreateProductHandler)
 
 	app.Get("/products/:id", productController.GetProductByIdHandler)
