@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"golang-elastic-search/model"
-	"net/http"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v7"
@@ -35,32 +34,73 @@ func (p *Operation) CreateProduct(product model.Product) error {
 
 	// Check for any errors in the response
 	if res.IsError() {
-		return fmt.Errorf("Error: %s", res.Status())
+		return fmt.Errorf("error: %s", res.Status())
 	}
 
 	return nil
 }
 
 func (p *Operation) GetProductById(id int) (*model.Product, error) {
-	// Retrieve a product by ID from Elasticsearch
-	res, err := p.client.Get("products", fmt.Sprintf("%d", id), p.client.Get.WithContext(context.Background()))
+	// Construct a search query to match a single product by ID
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"ID": id,
+			},
+		},
+	}
+
+	// Marshal the query into a JSON byte array
+	queryBytes, err := json.Marshal(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Perform a search request to retrieve the product by ID
+	res, err := p.client.Search(
+		p.client.Search.WithContext(context.Background()),
+		p.client.Search.WithIndex("products"),
+		p.client.Search.WithBody(bytes.NewReader(queryBytes)), // Wrap queryBytes in an io.Reader
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
-	// Check if the product doesn't exist
-	if res.StatusCode == http.StatusNotFound {
+	// Check for errors in the response
+	if res.IsError() {
+		return nil, fmt.Errorf("Elasticsearch error: %s", res.Status())
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	// Extract the product data from the response
+	hits, found := result["hits"].(map[string]interface{})
+	if !found {
+		return nil, fmt.Errorf("Failed to retrieve product with ID %d", id)
+	}
+
+	hitsData, found := hits["hits"].([]interface{})
+	if !found || len(hitsData) == 0 {
 		return nil, fmt.Errorf("Product with ID %d not found", id)
 	}
 
-	// Check for other errors in the response
-	if res.IsError() {
-		return nil, fmt.Errorf("Error: %s", res.Status())
+	firstHit, found := hitsData[0].(map[string]interface{})
+	if !found {
+		return nil, fmt.Errorf("Failed to retrieve product with ID %d", id)
+	}
+
+	source, found := firstHit["_source"].(map[string]interface{})
+	if !found {
+		return nil, fmt.Errorf("Failed to retrieve product with ID %d", id)
 	}
 
 	var product model.Product
-	if err := json.NewDecoder(res.Body).Decode(&product); err != nil {
+	err = mapstructure.Decode(source, &product)
+	if err != nil {
 		return nil, err
 	}
 
@@ -152,7 +192,7 @@ func (p *Operation) UpdateProduct(product model.Product) error {
 
 	// Check for any errors in the response
 	if res.IsError() {
-		return fmt.Errorf("Error: %s", res.Status())
+		return fmt.Errorf("error: %s", res.Status())
 	}
 
 	return nil
